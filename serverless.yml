@@ -3,42 +3,27 @@ service: demo-site
 frameworkVersion: ">=1.9.0 <2.0.0"
 
 custom:
-  stage: ${opt:stage, self:provider.stage}
-  stackname: ${self:service}-${self:custom.stage}
-  domains:
-    dev: ${self:custom.stage}--${self:service}.klickstuff.com
-    rc: rc1--${self:service}.klickstuff.com
-    prod: demo.com
-  domain: ${self:custom.domains.${self:custom.stage}, self:custom.domains.dev}
-  siteURL: { Fn::Join: ["", ["https://", "${self:custom.domain}"]]}
-  stages:
-    prod: prod
-    rc: rc
-    dev: dev
-  stageFlag: ${self:custom.stages.${self:custom.stage}, "dev"}
-  serviceEndpoint: {"Fn::Join": ["", ["https://", {Ref: "ApiGatewayRestApi"}, ".execute-api.", {Ref: "AWS::Region"}, ".amazonaws.com/", "${self:custom.stage}/"]]}
+  vars: ${file(./vars.yml):${opt:stageflag, "dev"}}
+  exportGitVariables: false
   output:
     format: toml
     file: .env
   scriptHooks:
     after:deploy:deploy:
       - yarn build
-      - sh ./scripts/deploy_static_files.sh ${self:custom.stackname}
+      - sh ./scripts/deploy_static_files.sh ${self:custom.vars.STACKNAME}
     before:remove:remove:
-      - sh ./scripts/remove_static_files.sh ${self:custom.stackname}
-  Tags:
-    - Key: SERVICE
-      Value: ${self:service}
+      - sh ./scripts/remove_static_files.sh ${self:custom.vars.STACKNAME}
 
 provider:
   name: aws
   region: us-east-1
   runtime: nodejs8.10
-  stackTags:
-    STAGE: ${self:custom.stage}
-    SERVICE: ${self:service}
+  stackName: ${self:custom.vars.STACKNAME}
+  deploymentBucket:
+    name: ${cf:marketing-resources-prod.DeploymentBucket}
+  stackTags: ${self:custom.vars.STACK_TAGS}
 
-    
 functions:
   getImages:
     handler: functions/getImages/index.handler
@@ -56,9 +41,9 @@ functions:
 resources:
   Description: Demo Site
   Conditions:
-    isProd: {"Fn::Equals" : ["${self:custom.stageFlag}", "prod"]}
-    isRC: {"Fn::Equals" : ["${self:custom.stageFlag}", "rc"]}
-    isDev: {"Fn::Equals" : ["${self:custom.stageFlag}", "dev"]}
+    isProd: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "prod"]}
+    isRC: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "rc"]}
+    isDev: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "dev"]}
     isProdOrRC: {"Fn::Or": [{"Condition": "isProd"}, {"Condition": "isRC" }]}
   Resources:
     ProxyEntry:
@@ -66,16 +51,18 @@ resources:
       Condition: isDev
       Version: '1.0'
       Properties:
-        ServiceToken:
-          Fn::ImportValue:
-            Fn::Sub: "demo-stack-entry-cfn-dev-arn"
-        Host:  ${self:custom.domain}
+        ServiceToken: ${self:custom.vars.CFPROXYENTRY_ARN}
+        Service: ${self:service}
+        Stage: ${self:custom.vars.STAGE}
         Origin: {"Fn::GetAtt": [WebsiteBucket, DomainName]}
     WebsiteBucket:
       Type: "AWS::S3::Bucket"
       Properties:
         AccessControl: Private
-        # AccelerateConfiguration:
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
     BucketPolicy:
       Type: "AWS::S3::BucketPolicy"
       Properties:
@@ -87,10 +74,16 @@ resources:
             Principal:
               Fn::If:
                 - isProdOrRC
-                - CanonicalUser:
-                  - {"Fn::GetAtt": [CloudfrontOAI, S3CanonicalUserId]}
-                - CanonicalUser:
-                  - {"Fn::ImportValue": "demo-stack-proxy-dev-S3CanonicalUserId"}
+                - 
+                  CanonicalUser:
+                    - {"Fn::GetAtt": [CloudfrontOAI, S3CanonicalUserId]}
+                  AWS:
+                    -  ${self:custom.vars.ORIGINREQUEST_ROLE_ARN}
+                - 
+                  CanonicalUser:
+                    - ${self:custom.vars.CLOUDFRONT_OAI_PROXY}
+                  AWS:
+                    - ${self:custom.vars.ORIGINREQUESTPROXY_ROLE_ARN}
             Action:
               - s3:ListBucket
               - s3:GetObject
@@ -102,28 +95,24 @@ resources:
       Condition: isProdOrRC
       Properties:
         CloudFrontOriginAccessIdentityConfig:
-          Comment: Created for ${self:custom.stackname}
+          Comment: Created for ${self:custom.vars.STACKNAME}
     CDN:
       Type: "AWS::CloudFront::Distribution"
       Condition: isProdOrRC
       Properties:
         DistributionConfig:
-          # WebACLId: 
-          #   Fn::If:
-          #     - isProd
-          #     - {Ref: AWS::NoValue}
-          #     - {Fn::ImportValue: "wafacl-prod"}
-          Aliases:
-            - ${self:custom.domain}
+          ViewerCertificate:
+            AcmCertificateArn: ${self:custom.vars.ACM_CERT_ARN}
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2018
+          WebACLId: ${self:custom.vars.WAF}
+          Aliases: 
+            - ${self:custom.vars.DOMAIN}
           Enabled: true
           HttpVersion: http2
-          PriceClass: PriceClass_All
+          PriceClass: PriceClass_100
           IPV6Enabled: true
           DefaultRootObject: index.html
-          CustomErrorResponses:
-            - ErrorCode: 404
-              ResponseCode: 404
-              ResponsePagePath: /error.html
           Origins:
             - DomainName: {"Fn::GetAtt": [WebsiteBucket, DomainName]}
               Id: s3-origin
@@ -131,38 +120,44 @@ resources:
                 OriginAccessIdentity: {"Fn::Join": ["", ["origin-access-identity/cloudfront/", {Ref: CloudfrontOAI}]]}
           DefaultCacheBehavior:
             AllowedMethods:
+              - DELETE
               - GET
               - HEAD
+              - OPTIONS
+              - PATCH
+              - POST
+              - PUT
             CachedMethods:
               - GET
               - HEAD
             Compress: true
             ForwardedValues:
-              QueryString: false
+              QueryString: true
               Cookies:
                 Forward: none
+              Headers:
+                - Host
+                - CloudFront-Viewer-Country
+                - Accept-Language
             DefaultTTL: 3600
             MaxTTL: 86400
             MinTTL: 0
-            # PathPattern: String
-            # SmoothStreaming: Boolean
             TargetOriginId: s3-origin
-            # TrustedSigners:
-            #   - String
             ViewerProtocolPolicy: redirect-to-https
-        Tags: ${self:custom.Tags}
+            LambdaFunctionAssociations: 
+              - EventType: origin-request
+                LambdaFunctionARN: ${self:custom.vars.ORIGINREQUEST_LAMBDA_ARN}
+              - EventType: origin-response
+                LambdaFunctionARN: ${self:custom.vars.ORIGINRESPONSE_LAMBDA_ARN}
+        Tags: ${self:custom.vars.TAGS}
     DnsRecords:
       Condition: isProdOrRC
       Type: "AWS::Route53::RecordSetGroup"
       Properties:
-        HostedZoneName:
-          Fn::If:
-            - isRC
-            - demo.com.
-            - ${self:custom.domain}.
-        Comment: "DNS records associated with ${self:custom.stackname}"
+        HostedZoneName: ${self:custom.vars.HOSTED_ZONE}
+        Comment: "DNS records associated with ${self:custom.vars.STACKNAME}"
         RecordSets:
-          - Name: ${self:custom.domain}
+          - Name: ${self:custom.vars.DOMAIN}
             Type: A
             AliasTarget:
               DNSName:  {"Fn::GetAtt": [CDN, DomainName]}
@@ -170,7 +165,7 @@ resources:
 
   Outputs:
     SiteUrl:
-      Value: ${self:custom.siteURL}
+      Value: ${self:custom.vars.SITE_URL}
       Description: URL of the website
     WebsiteBucket:
       Value: {Ref: WebsiteBucket}
@@ -184,19 +179,17 @@ resources:
       Value: {Ref: CDN}
       Description: ID of the CloudFront distribution
     ReactAppStackname:
-      Value: ${self:custom.stackname}
+      Value: ${self:custom.vars.STACKNAME}
       Description: Name of stack/service
     ReactAppServiceEndpoint:
       Description: Service Endpoint
-      Value: ${self:custom.serviceEndpoint}
-      # Export:
-      #   Name: "${self:custom.stackname}-endpoint"
+      Value: ${self:custom.vars.SERVICE_ENDPOINT}
     
-
 plugins:
+  - serverless-plugin-git-variables
   - serverless-stack-output
-  - serverless-print-dots
   - serverless-scriptable-plugin
+  - serverless-print-dots
 
 package:
   individually: true

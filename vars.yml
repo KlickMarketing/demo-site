@@ -1,0 +1,50 @@
+default: &default
+  REGION: ${opt:region, self:provider.region}
+  STAGE: ${opt:stage, "dev"}
+  STACKNAME: ${self:service}-${self:custom.vars.STAGE}
+  STACK_TAGS:
+    SERVICE: ${self:service}
+    GIT_REPOSITORY: ${git:repository}
+    GIT_BRANCH: ${self:custom.vars.STAGE}
+  TAGS:
+    - Key: SERVICE
+      Value: ${self:service}
+    - Key: STACKNAME
+      Value: ${self:custom.vars.STACKNAME}
+  SITE_TITLE: "Demo Site | Klick Health"
+  SITE_DESC: "A website for a Demo stuff."
+
+  SERVICE_ENDPOINT: {"Fn::Join": ["", ["https://", {Ref: "ApiGatewayRestApi"}, ".execute-api.", {Ref: "AWS::Region"}, ".amazonaws.com/", "${self:custom.vars.STAGE}/"]]}
+  
+  ORIGINREQUEST_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:stack-proxy-prod-originrequest:1"
+  ORIGINRESPONSE_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:stack-proxy-prod-originresponse:1"
+  ORIGINREQUESTPROXY_ROLE_ARN: "arn:aws:iam::860984675421:role/stack-proxy-prod-originrequestproxy-role"
+  ORIGINREQUEST_ROLE_ARN: "arn:aws:iam::860984675421:role/stack-proxy-prod-originrequest-role"
+  CFPROXYENTRY_ARN: "arn:aws:lambda:us-east-1:860984675421:function:stack-proxy-prod-cfproxyentry"
+  CLOUDFRONT_OAI_PROXY: "62679c7475e50b456f7964f5a4a7a1303c9a2e55a9aff95631c9c7d0e5982037ec86fa45626cdd5cf1a2b80b3f471569"
+
+dev:
+  <<: [*default]
+  STAGEFLAG: dev
+  DOMAIN: {Fn::GetAtt: [ ProxyEntry, Host ]}
+  HOSTED_ZONE: {Ref: "AWS::NoValue"}
+  SITE_URL: { Fn::Join: ["", ["https://", "${self:custom.vars.DOMAIN}"]]}
+  WAF: {Ref: "AWS::NoValue"}
+  ACM_CERT_ARN: {Ref: "AWS::NoValue"}
+
+prod: &prod
+  <<: [*default]
+  STAGEFLAG: prod
+  APEX_DOMAIN: klickstuff.com
+  DOMAIN: eventsite.klickstuff.com
+  HOSTED_ZONE: "${self:custom.vars.APEX_DOMAIN}."
+  SITE_URL: { Fn::Join: ["", ["https://", "${self:custom.vars.DOMAIN}"]]}
+  WAF: {Fn::ImportValue: "sandbox-wafacl-prod"}
+  ACM_CERT_ARN: "arn:aws:acm:us-east-1:812730701436:certificate/d23473e1-173a-4a59-9bac-f87248b85c1c"
+
+rc:
+  <<: [*prod]
+  STAGEFLAG: rc
+  APEX_DOMAIN: klickstuff.com
+  DOMAIN: ${self:custom.vars.STAGE}--${self:service}.rc.${self:custom.vars.APEX_DOMAIN}
+  ACM_CERT_ARN: "arn:aws:acm:us-east-1:812730701436:certificate/0eb193b7-bf0f-426e-bedb-91cdc128651d"

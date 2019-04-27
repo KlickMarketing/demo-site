@@ -9,59 +9,51 @@ steps:
       - yarn install
 
   DeployDev:
-    title: Deploy to Dev
+    title: Deploy Feature Branch
     image: klickinc/marketing-build-harness:398e066
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=${{SANDBOX_ACCESS_KEY_ID}}
-      - AWS_SECRET_ACCESS_KEY=${{SANDBOX_SECRET_ACCESS_KEY_ID}}
+      - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
+      - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s ${{CF_BRANCH}} -v
-      - cat .env
+      - sls deploy -s ${{CF_BRANCH}} -v --force --stageflag dev
       - >-
-        cf_export SITEURL=$(sls info -s ${{CF_BRANCH}} --verbose | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
-      - >-
-        cf_export STACKNAME=$(sls info -s ${{CF_BRANCH}} --verbose | grep ReactAppStackname | sed -e 's/.*: \(.*\)/\1/')
+        cf_export SITE_URL=$(sls info -s ${{CF_BRANCH}} --stageflag dev -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
       branch:
         only:
-          - dev
           - /^feat-/i
 
   DeployRC:
-    title: Deploy to RC
+    title: Deploy Release Candidate
     image: klickinc/marketing-build-harness:398e066
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=${{PROD_ACCESS_KEY_ID}}
-      - AWS_SECRET_ACCESS_KEY=${{PROD_SECRET_ACCESS_KEY_ID}}
+      - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
+      - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s ${{CF_BRANCH}} -v
+      - sls deploy -s ${{CF_BRANCH}} -v --force --stageflag rc
       - >-
-        cf_export SITEURL=$(sls info -s ${{CF_BRANCH}} --verbose | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
-      - >-
-        cf_export STACKNAME=$(sls info -s ${{CF_BRANCH}} --verbose | grep ReactAppStackname | sed -e 's/.*: \(.*\)/\1/')
+        cf_export SITE_URL=$(sls info -s ${{CF_BRANCH}} --stageflag rc -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
       branch:
         only:
-          - rc
+          - /^rc-/i
 
   DeployProd:
-    title: Deploy to Prod
+    title: Deploy to Production
     image: klickinc/marketing-build-harness:398e066
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
-      - AWS_ACCESS_KEY_ID=${{PROD_ACCESS_KEY_ID}}
-      - AWS_SECRET_ACCESS_KEY=${{PROD_SECRET_ACCESS_KEY_ID}}
+      - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
+      - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s prod -v
+      - sls deploy -s prod -v --force --stageflag prod
       - >-
-        cf_export SITEURL=$(sls info -s prod --verbose | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
-      - >-
-        cf_export STACKNAME=$(sls info -s prod --verbose | grep ReactAppStackname | sed -e 's/.*: \(.*\)/\1/')
+        cf_export SITE_URL=$(sls info -s prod --stageflag prod -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
       branch:
         only:
@@ -72,55 +64,51 @@ steps:
     image: klickinc/lighthouse-ci:latest
     working_directory: ${{main_clone}}
     commands:
-      - echo ${{SITEURL}}
-      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITEURL}} --output json > report.json
-      # - LIGHTHOUSE_SCORE=$(cat report.json | json score | awk '{print int($1)}')
-      - cat report.json
-      - >-
-        cf_export LIGHTHOUSE_SCORE=$(cat report.json | json score | awk '{print int($1)}')
-      - echo ${{SITEURL}}
+      - echo ${{SITE_URL}}
+      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITE_URL}} --output json > report.json
+      - LIGHTHOUSE_SCORE=$(cat report.json | json score | awk '{print int($1)}')
+      - echo ${{SITE_URL}}
       - echo "LIGHTHOUSE_SCORE ${LIGHTHOUSE_SCORE}"
+      - >-
+        cf_export LIGHTHOUSE_SCORE=${LIGHTHOUSE_SCORE}
       # - if [ "$LIGHTHOUSE_SCORE" -le "60" ]; then exit 1; else exit 0; fi
     when:
       branch:
         only:
           - master
-          - rc
-          - dev
+          - /^rc-/i
           - /^feat-/i
 
   SlackNotification:
     title: Send Slack Notification
-    image: cloudposse/slack-notifier:0.1.3
+    image: cloudposse/slack-notifier@sha256:ff2fb8f7fd7fd04c5f005b90843493ff2bc8f620a9997c1e1a5b8ba8ee04c352
     environment:
-      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/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
-      - SLACK_USER_NAME=CodeFresh
-      - "SLACK_ICON_EMOJI=:white_check_mark:"
-      - SLACK_FALLBACK="Deployed ${{STACKNAME}} environment"
-      - SLACK_COLOR="good"
-      - SLACK_PRETEXT=${{CF_COMMIT_MESSAGE}}
-      - SLACK_AUTHOR_NAME=${{CF_COMMIT_AUTHOR}}
-      - SLACK_AUTHOR_LINK=https://cloudposse.com/wp-content/uploads/sites/29/2018/02/small-cute-robot-square.png
-      - SLACK_AUTHOR_ICON=https://cloudposse.com/wp-content/uploads/sites/29/2018/02/small-cute-robot-square.png
-      - SLACK_TITLE=${{SITEURL}}
-      - SLACK_TITLE_LINK=${{SITEURL}}
-      # - SLACK_TEXT="The latest changes have been deployed"
-      - SLACK_THUMB_URL=https://avatars0.githubusercontent.com/u/43070060?s=200&v=4
-      # - SLACK_FOOTER="Helm Deployment"
-      # - SLACK_FOOTER_ICON=https://cloudposse.com/wp-content/uploads/sites/29/2018/02/kubernetes.png
-      - SLACK_FIELD1_TITLE=Stack
-      - SLACK_FIELD1_VALUE=${{STACKNAME}}
-      - SLACK_FIELD1_SHORT=false
-      - SLACK_FIELD2_TITLE=Branch
+      - SLACK_WEBHOOK_URL=${{SLACK_WEBHOOK_URL}}
+      - SLACK_USER_NAME=Codefresh
+      - "SLACK_ICON_EMOJI=:klick:"
+      - SLACK_TITLE=Build Completed
+      - SLACK_TITLE_LINK=${{CF_BUILD_URL}}
+      - SLACK_FIELD1_TITLE=Git Repository Name
+      - SLACK_FIELD1_VALUE=${{CF_REPO_NAME}}
+      - SLACK_FIELD1_SHORT=true
+      - SLACK_FIELD2_TITLE=Git Branch
       - SLACK_FIELD2_VALUE=${{CF_BRANCH}}
       - SLACK_FIELD2_SHORT=true
-      - SLACK_FIELD3_TITLE=Lighthouse
-      - SLACK_FIELD3_VALUE=${{LIGHTHOUSE_SCORE}}
+      - SLACK_FIELD3_TITLE=Git Repository Link
+      - SLACK_FIELD3_VALUE=https://github.com/KlickMarketing/${{CF_REPO_NAME}}/tree/${{CF_BRANCH}}
       - SLACK_FIELD3_SHORT=true
+      - SLACK_FIELD4_TITLE=Git Version
+      - SLACK_FIELD4_VALUE=${{CF_SHORT_REVISION}}
+      - SLACK_FIELD4_SHORT=true
+      - SLACK_FIELD5_TITLE=Site URL
+      - SLACK_FIELD5_VALUE=${{SITE_URL}}
+      - SLACK_FIELD5_SHORT=true
+      - SLACK_FIELD6_TITLE=Lighthouse Score
+      - SLACK_FIELD6_VALUE=${{LIGHTHOUSE_SCORE}}
+      - SLACK_FIELD6_SHORT=true
     when:
       branch:
         only:
           - master
-          - rc
-          - dev
+          - /^rc-/i
           - /^feat-/i
