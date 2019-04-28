@@ -7,13 +7,13 @@ custom:
   exportGitVariables: false
   output:
     format: toml
-    file: .env
+    file: ../frontend/.env
   scriptHooks:
     after:deploy:deploy:
-      - yarn build
-      - sh ./scripts/deploy_static_files.sh ${self:custom.vars.STACKNAME}
+      - cd ../frontend && yarn build
+      - cd ../frontend && sh ./scripts/deploy_static_files.sh ${self:custom.vars.STACKNAME}
     before:remove:remove:
-      - sh ./scripts/remove_static_files.sh ${self:custom.vars.STACKNAME}
+      - cd ../frontend && sh ./scripts/remove_static_files.sh ${self:custom.vars.STACKNAME}
 
 provider:
   name: aws
@@ -23,20 +23,52 @@ provider:
   deploymentBucket:
     name: ${cf:marketing-resources-prod.DeploymentBucket}
   stackTags: ${self:custom.vars.STACK_TAGS}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "execute-api:ManageConnections"
+      Resource:
+        - "arn:aws:execute-api:*:*:**/@connections/*"
+    - Effect: Allow
+      Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:UpdateItem"
+        - "dynamodb:DeleteItem"
+        - "dynamodb:Query"
+        - "dynamodb:Scan"
+      Resource:
+        - Fn::GetAtt: [ChatConnectionsTable, Arn]
+        - Fn::Join:
+            - "/"
+            - - Fn::GetAtt: [ChatConnectionsTable, Arn]
+              - "*"
+  environment:
+    CHATCONNECTION_TABLE:
+      Ref: ChatConnectionsTable
+
+  websocketApiName: websocket-chat-${self:provider.stage}
+  websocketApiRouteSelectionExpression: $request.body.action
+
 
 functions:
-  getImages:
-    handler: functions/getImages/index.handler
-    memorySize: 128
-    timeout: 5
+  connectionManager:
+    handler: handler.connectionManager
     events:
-      - http:
-          path: images
-          method: get
-          cors: true
-    package:
-      include:
-        - functions/getImages/**/*
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+  defaultMessages:
+    handler: handler.defaultMessage
+    events:
+      - websocket:
+          route: $default
+  sendMessage:
+    handler: handler.sendMessage
+    events:
+      - websocket:
+          route: sendMessage
 
 resources:
   Description: Demo Site
@@ -162,6 +194,18 @@ resources:
             AliasTarget:
               DNSName:  {"Fn::GetAtt": [CDN, DomainName]}
               HostedZoneId: Z2FDTNDATAQYW2
+    ChatConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
 
   Outputs:
     SiteUrl:
@@ -181,9 +225,10 @@ resources:
     ReactAppStackname:
       Value: ${self:custom.vars.STACKNAME}
       Description: Name of stack/service
-    ReactAppServiceEndpoint:
-      Description: Service Endpoint
-      Value: ${self:custom.vars.SERVICE_ENDPOINT}
+
+    # ReactAppServiceEndpoint:
+    #   Description: Service Endpoint
+    #   Value: ${self:custom.vars.SERVICE_ENDPOINT}
     
 plugins:
   - serverless-plugin-git-variables
@@ -195,3 +240,6 @@ package:
   individually: true
   exclude:
     - '**/*'
+  include:
+    - node_modules/**/*
+    - handler.js
