@@ -20,8 +20,6 @@ provider:
   region: us-east-1
   runtime: nodejs8.10
   stackName: ${self:custom.vars.STACKNAME}
-  deploymentBucket:
-    name: ${cf:marketing-resources-prod.DeploymentBucket}
   stackTags: ${self:custom.vars.STACK_TAGS}
   iamRoleStatements:
     - Effect: Allow
