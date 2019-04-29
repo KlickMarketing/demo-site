@@ -35,20 +35,16 @@ const Voter = () => {
     setBallotsList({ ...ballotsList, ...voteData });
   };
 
-  const onConnection = e => {
-    console.log('connected:', e);
-  };
-
   useEffect(() => {
     ws = new Sockette(config.site.api, {
       timeout: 5e3,
       maxAttempts: 1,
-      onopen: e => onConnection(e),
+      onopen: e => console.log('connected:', e), // eslint-disable-line no-console
       onmessage: e => onMessageReceied(e),
-      onreconnect: e => console.log('Reconnecting...', e),
-      onmaximum: e => console.log('Stop Attempting!', e),
-      onclose: e => console.log('Closed!', e),
-      onerror: e => console.log('Error:', e)
+      onreconnect: e => console.log('Reconnecting...', e), // eslint-disable-line no-console
+      onmaximum: e => console.log('Stop Attempting!', e), // eslint-disable-line no-console
+      onclose: e => console.log('Closed!', e), // eslint-disable-line no-console
+      onerror: e => console.log('Error:', e) // eslint-disable-line no-console
     });
     return function cleanup() {
       ws && ws.close();
