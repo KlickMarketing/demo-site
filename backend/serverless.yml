@@ -225,10 +225,15 @@ resources:
     ReactAppStackname:
       Value: ${self:custom.vars.STACKNAME}
       Description: Name of stack/service
-
-    # ReactAppServiceEndpoint:
-    #   Description: Service Endpoint
-    #   Value: ${self:custom.vars.SERVICE_ENDPOINT}
+    ReactAppSiteUrl:
+      Value: ${self:custom.vars.SITE_URL}
+      Description: URL of the website
+    ReactAppGitHash:
+      Value: ${git:sha1}
+      Description: Git Hash
+    ReactAppServiceEndpoint:
+      Value: ${self:custom.vars.SERVICE_ENDPOINT}
+      Description: Service Endpoint
     
 plugins:
   - serverless-plugin-git-variables

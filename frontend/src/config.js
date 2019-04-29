@@ -1,11 +1,11 @@
-const aws_exports = {
-  Auth: {
-    region: "ap-southeast-2",
-    userPoolId: "us-east-1_jilNGUNnq",
-    userPoolWebClientId: "60qjlpvnpqe12gq4kg9aifedsi",
-    mandatorySignIn: false,
-    authenticationFlowType: "USER_SRP_AUTH"
+const config = {
+  git: {
+    hash: process.env.ReactAppGitHash
+  },
+  site: {
+    url: process.env.ReactAppSiteUrl,
+    api: process.env.ReactAppServiceEndpoint,
   }
 };
 
-export default aws_exports;
+export default config;
