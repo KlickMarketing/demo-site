@@ -1,6 +1,6 @@
-import React from "react";
-import styled, { createGlobalStyle } from "styled-components";
-import Voter from "./Voter";
+import React from 'react';
+import styled, { createGlobalStyle } from 'styled-components';
+import Voter from './Voter';
 
 const App = () => {
   return (
@@ -11,13 +11,12 @@ const App = () => {
   );
 };
 
-
-
 const GlobalStyle = createGlobalStyle`
   html, body, #root {
     height: 100%;
+    background: #b5aaaa;
   }
-`
+`;
 
 const StyledApp = styled.div`
   height: 100%;
