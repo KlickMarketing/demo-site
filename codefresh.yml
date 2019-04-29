@@ -17,7 +17,7 @@ steps:
       - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
       - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - cd backend && cd backend && sls deploy -s ${{CF_BRANCH}} -v --force --stageflag dev
+      - cd backend && sls deploy -s ${{CF_BRANCH}} -v --force --stageflag dev
       - >-
         cf_export SITE_URL=$(sls info -s ${{CF_BRANCH}} --stageflag dev -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
