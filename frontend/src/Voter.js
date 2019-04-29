@@ -100,8 +100,6 @@ const Voter = () => {
       <ChartBar>
         <ShortCuts>
           <StyledQR src={qrCode} alt="Scan Me" />
-          <br />
-          <BitlyLink>bit.ly/2V4oBZN</BitlyLink>
         </ShortCuts>
         <StyledChart width={600} height={400} yType="ordinal">
           <VerticalGridLines />
@@ -202,16 +200,6 @@ const StyledChart = styled(XYPlot)`
 
   @media only screen and (min-width: 768px) {
     transform: none;
-  }
-`;
-
-const BitlyLink = styled.span`
-  font-size: 3em;
-  font-weight: 700;
-  display: none;
-
-  @media only screen and (min-width: 992px) {
-    display: inline;
   }
 `;
 
