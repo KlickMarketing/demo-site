@@ -87,7 +87,7 @@ steps:
     title: Send Slack Notification
     image: cloudposse/slack-notifier@sha256:ff2fb8f7fd7fd04c5f005b90843493ff2bc8f620a9997c1e1a5b8ba8ee04c352
     environment:
-      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/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
+      - SLACK_WEBHOOK_URL=${{SLACK_WEBHOOK_URL}}
       - SLACK_USER_NAME=Codefresh
       - 'SLACK_ICON_EMOJI=:klick:'
       - SLACK_TITLE=Build Completed
