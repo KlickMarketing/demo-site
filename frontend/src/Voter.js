@@ -10,6 +10,8 @@ import {
 
 import Sockette from 'sockette';
 import styled from 'styled-components';
+import Color from 'color';
+import QRCode from 'qrcode';
 import config from './config';
 
 import sigilStark from './images/stark.png';
@@ -30,6 +32,7 @@ const Voter = () => {
     Lannister: 0,
     Tully: 0
   });
+  const [qrCode, setQrCode] = useState();
 
   const onVote = vote => {
     console.log('vote:', vote); // eslint-disable-line no-console
@@ -48,6 +51,16 @@ const Voter = () => {
     console.log('connection:', e); // eslint-disable-line no-console
     onVote('');
   };
+
+  useEffect(() => {
+    QRCode.toDataURL(config.site.url, { scale: 10 })
+      .then(url => {
+        setQrCode(url);
+      })
+      .catch(err => {
+        console.error(err); // eslint-disable-line no-console
+      });
+  }, []);
 
   useEffect(() => {
     ws = new Sockette(config.site.api, {
@@ -85,7 +98,11 @@ const Voter = () => {
   return (
     <VoterArea>
       <ChartBar>
-        <XYPlot width={600} height={400} yType="ordinal">
+        <ShortCuts>
+          <StyledQR src={qrCode} alt="Scan Me" />
+          <BitlyLink>bit.ly/2V4oBZN</BitlyLink>
+        </ShortCuts>
+        <StyledChart width={600} height={400} yType="ordinal">
           <VerticalGridLines />
           <HorizontalGridLines />
           <XAxis />
@@ -94,7 +111,7 @@ const Voter = () => {
             colorType="literal"
             data={formatData(ballotsList)}
           />
-        </XYPlot>
+        </StyledChart>
       </ChartBar>
       <VoterButtonBar>
         <VoterButton color="#414141">
@@ -151,13 +168,49 @@ const VoterArea = styled.div`
 `;
 
 const ChartBar = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  align-self: center;
+  justify-self: center;
+  overflow: hidden;
+
+  @media only screen and (min-width: 992px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`;
+
+const ShortCuts = styled.div`
+  align-self: center;
+  justify-self: center;
+  text-align: center;
+`;
+
+const StyledQR = styled.img`
+  display: none;
+
+  @media only screen and (min-width: 992px) {
+    display: inline;
+  }
+`;
+
+const StyledChart = styled(XYPlot)`
   align-self: center;
   justify-self: center;
   transform: scale(0.5);
-  overflow: hidden;
+  padding-right: 30px;
 
   @media only screen and (min-width: 768px) {
-    transform: inherit;
+    transform: none;
+  }
+`;
+
+const BitlyLink = styled.span`
+  font-size: 3em;
+  font-weight: 700;
+  display: none;
+
+  @media only screen and (min-width: 992px) {
+    display: inline;
   }
 `;
 
@@ -173,6 +226,19 @@ const VoterButtonBar = styled.div`
 
 const VoterButton = styled.div`
   background-color: ${props => (props.color ? props.color : 'green')};
+
+  :hover,
+  :active {
+    background-color: ${props =>
+      props.color
+        ? Color(props.color)
+            .lighten(0.5)
+            .hex()
+        : Color('green')
+            .lighten(0.5)
+            .hex()};
+    cursor: pointer;
+  }
 `;
 
 const VoterThumb = styled.img`
