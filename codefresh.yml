@@ -1,23 +1,23 @@
 version: '1.0'
 steps:
-
   UnitTesting:
     title: Unit Testing Application
-    image: klickinc/marketing-build-harness:398e066
+    image: klickinc/marketing-build-harness:9558330
     working_directory: ${{main_clone}}
     commands:
-      - yarn install
+      - cd backend && yarn install
+      - cd ../frontend && yarn install
 
   DeployDev:
     title: Deploy Feature Branch
-    image: klickinc/marketing-build-harness:398e066
+    image: klickinc/marketing-build-harness:9558330
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
       - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s ${{CF_BRANCH}} -v --force --stageflag dev
+      - cd backend && sls deploy -s ${{CF_BRANCH}} -v --stageflag dev
       - >-
         cf_export SITE_URL=$(sls info -s ${{CF_BRANCH}} --stageflag dev -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
@@ -27,14 +27,14 @@ steps:
 
   DeployRC:
     title: Deploy Release Candidate
-    image: klickinc/marketing-build-harness:398e066
+    image: klickinc/marketing-build-harness:9558330
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
       - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s ${{CF_BRANCH}} -v --force --stageflag rc
+      - cd backend && sls deploy -s ${{CF_BRANCH}} -v --stageflag rc
       - >-
         cf_export SITE_URL=$(sls info -s ${{CF_BRANCH}} --stageflag rc -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
@@ -44,14 +44,14 @@ steps:
 
   DeployProd:
     title: Deploy to Production
-    image: klickinc/marketing-build-harness:398e066
+    image: klickinc/marketing-build-harness:9558330
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=${{DEMO_ACCESS_KEY_ID}}
       - AWS_SECRET_ACCESS_KEY=${{DEMO_SECRET_ACCESS_KEY_ID}}
     commands:
-      - sls deploy -s prod -v --force --stageflag prod
+      - cd backend && sls deploy -s prod -v --stageflag prod
       - >-
         cf_export SITE_URL=$(sls info -s prod --stageflag prod -v | grep SiteUrl | sed -e 's/.*: \(.*\)/\1/')
     when:
@@ -61,17 +61,21 @@ steps:
 
   LighthouseTest:
     title: Test with Lighthouse
-    image: klickinc/lighthouse-ci:latest
+    image: klickinc/lighthouse-ci@sha256:cdef4c5b05d1d42f0fc18fb6b82efa65b5909f31149269b555e1a12bbe545963
     working_directory: ${{main_clone}}
     commands:
       - echo ${{SITE_URL}}
-      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITE_URL}} --output json > report.json
-      - LIGHTHOUSE_SCORE=$(cat report.json | json score | awk '{print int($1)}')
-      - echo ${{SITE_URL}}
-      - echo "LIGHTHOUSE_SCORE ${LIGHTHOUSE_SCORE}"
-      - >-
-        cf_export LIGHTHOUSE_SCORE=${LIGHTHOUSE_SCORE}
-      # - if [ "$LIGHTHOUSE_SCORE" -le "60" ]; then exit 1; else exit 0; fi
+      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITE_URL}} --quiet --output json > report.json
+      - export LIGHTHOUSE_PERF=$(cat report.json | jqn --color false 'get("categories.performance.score")')
+      - export LIGHTHOUSE_A11Y=$(cat report.json | jqn --color false 'get("categories.accessibility.score")')
+      - export LIGHTHOUSE_BEST=$(cat report.json | jqn --color false 'get("categories.best-practices.score")')
+      - export LIGHTHOUSE_SEO=$(cat report.json | jqn --color false 'get("categories.seo.score")')
+      - export LIGHTHOUSE_PWA=$(cat report.json | jqn --color false 'get("categories.pwa.score")')
+      - cf_export LIGHTHOUSE_PERF
+      - cf_export LIGHTHOUSE_A11Y
+      - cf_export LIGHTHOUSE_BEST
+      - cf_export LIGHTHOUSE_SEO
+      - cf_export LIGHTHOUSE_PWA
     when:
       branch:
         only:
@@ -85,7 +89,7 @@ steps:
     environment:
       - SLACK_WEBHOOK_URL=${{SLACK_WEBHOOK_URL}}
       - SLACK_USER_NAME=Codefresh
-      - "SLACK_ICON_EMOJI=:klick:"
+      - 'SLACK_ICON_EMOJI=:klick:'
       - SLACK_TITLE=Build Completed
       - SLACK_TITLE_LINK=${{CF_BUILD_URL}}
       - SLACK_FIELD1_TITLE=Git Repository Name
@@ -103,8 +107,8 @@ steps:
       - SLACK_FIELD5_TITLE=Site URL
       - SLACK_FIELD5_VALUE=${{SITE_URL}}
       - SLACK_FIELD5_SHORT=true
-      - SLACK_FIELD6_TITLE=Lighthouse Score
-      - SLACK_FIELD6_VALUE=${{LIGHTHOUSE_SCORE}}
+      - SLACK_FIELD6_TITLE=Lighthouse Scores
+      - "SLACK_FIELD6_VALUE=PERF: ${{LIGHTHOUSE_PERF}}   A11Y: ${{LIGHTHOUSE_A11Y}}\nBEST: ${{LIGHTHOUSE_BEST}}   SEO: ${{LIGHTHOUSE_SEO}}\nPWA: ${{LIGHTHOUSE_PWA}}"
       - SLACK_FIELD6_SHORT=true
     when:
       branch:

@@ -14,8 +14,8 @@ default: &default
   SITE_TITLE: "Demo Site | Klick Health"
   SITE_DESC: "A website for a Demo stuff."
 
-  SERVICE_ENDPOINT: {"Fn::Join": ["", ["https://", {Ref: "ApiGatewayRestApi"}, ".execute-api.", {Ref: "AWS::Region"}, ".amazonaws.com/", "${self:custom.vars.STAGE}/"]]}
-  
+  SERVICE_ENDPOINT: {"Fn::Join": ["", ["wss://", {Ref: "WebsocketsApi"}, ".execute-api.", {Ref: "AWS::Region"}, ".amazonaws.com/", "${self:custom.vars.STAGE}/"]]}
+
   ORIGINREQUEST_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:stack-proxy-prod-originrequest:1"
   ORIGINRESPONSE_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:stack-proxy-prod-originresponse:1"
   ORIGINREQUESTPROXY_ROLE_ARN: "arn:aws:iam::860984675421:role/stack-proxy-prod-originrequestproxy-role"

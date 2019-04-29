@@ -1,50 +1,80 @@
 service: demo-site
 
-frameworkVersion: ">=1.9.0 <2.0.0"
+frameworkVersion: '>=1.9.0 <2.0.0'
 
 custom:
   vars: ${file(./vars.yml):${opt:stageflag, "dev"}}
   exportGitVariables: false
   output:
     format: toml
-    file: .env
+    file: ../frontend/.env
   scriptHooks:
     after:deploy:deploy:
-      - yarn build
-      - sh ./scripts/deploy_static_files.sh ${self:custom.vars.STACKNAME}
+      - cd ../frontend && yarn build
+      - cd ../frontend && sh ./scripts/deploy_static_files.sh ${self:custom.vars.STACKNAME}
     before:remove:remove:
-      - sh ./scripts/remove_static_files.sh ${self:custom.vars.STACKNAME}
+      - cd ../frontend && sh ./scripts/remove_static_files.sh ${self:custom.vars.STACKNAME}
 
 provider:
   name: aws
   region: us-east-1
   runtime: nodejs8.10
   stackName: ${self:custom.vars.STACKNAME}
-  deploymentBucket:
-    name: ${cf:marketing-resources-prod.DeploymentBucket}
   stackTags: ${self:custom.vars.STACK_TAGS}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - 'execute-api:ManageConnections'
+      Resource:
+        - 'arn:aws:execute-api:*:*:**/@connections/*'
+    - Effect: Allow
+      Action:
+        - 'dynamodb:PutItem'
+        - 'dynamodb:GetItem'
+        - 'dynamodb:UpdateItem'
+        - 'dynamodb:DeleteItem'
+        - 'dynamodb:Query'
+        - 'dynamodb:Scan'
+      Resource:
+        - Fn::GetAtt: [ChatConnectionsTable, Arn]
+        - Fn::Join:
+            - '/'
+            - - Fn::GetAtt: [ChatConnectionsTable, Arn]
+              - '*'
+  environment:
+    CHATCONNECTION_TABLE:
+      Ref: ChatConnectionsTable
+
+  websocketApiName: websocket-chat-${self:provider.stage}
+  websocketApiRouteSelectionExpression: $request.body.action
 
 functions:
-  getImages:
-    handler: functions/getImages/index.handler
-    memorySize: 128
-    timeout: 5
+  connectionManager:
+    handler: handler.connectionManager
     events:
-      - http:
-          path: images
-          method: get
-          cors: true
-    package:
-      include:
-        - functions/getImages/**/*
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+  defaultMessages:
+    handler: handler.defaultMessage
+    events:
+      - websocket:
+          route: $default
+  sendMessage:
+    handler: handler.sendMessage
+    events:
+      - websocket:
+          route: sendMessage
 
 resources:
   Description: Demo Site
   Conditions:
-    isProd: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "prod"]}
-    isRC: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "rc"]}
-    isDev: {"Fn::Equals" : ["${self:custom.vars.STAGEFLAG}", "dev"]}
-    isProdOrRC: {"Fn::Or": [{"Condition": "isProd"}, {"Condition": "isRC" }]}
+    isProd: { 'Fn::Equals': ['${self:custom.vars.STAGEFLAG}', 'prod'] }
+    isRC: { 'Fn::Equals': ['${self:custom.vars.STAGEFLAG}', 'rc'] }
+    isDev: { 'Fn::Equals': ['${self:custom.vars.STAGEFLAG}', 'dev'] }
+    isProdOrRC:
+      { 'Fn::Or': [{ 'Condition': 'isProd' }, { 'Condition': 'isRC' }] }
   Resources:
     ProxyEntry:
       Type: 'Custom::MarketingStackProxyEntry'
@@ -54,9 +84,9 @@ resources:
         ServiceToken: ${self:custom.vars.CFPROXYENTRY_ARN}
         Service: ${self:service}
         Stage: ${self:custom.vars.STAGE}
-        Origin: {"Fn::GetAtt": [WebsiteBucket, DomainName]}
+        Origin: { 'Fn::GetAtt': [WebsiteBucket, DomainName] }
     WebsiteBucket:
-      Type: "AWS::S3::Bucket"
+      Type: 'AWS::S3::Bucket'
       Properties:
         AccessControl: Private
         BucketEncryption:
@@ -64,23 +94,21 @@ resources:
             - ServerSideEncryptionByDefault:
                 SSEAlgorithm: AES256
     BucketPolicy:
-      Type: "AWS::S3::BucketPolicy"
+      Type: 'AWS::S3::BucketPolicy'
       Properties:
-        Bucket: {Ref: WebsiteBucket}
+        Bucket: { Ref: WebsiteBucket }
         PolicyDocument:
-          Version: "2012-10-17"
+          Version: '2012-10-17'
           Statement:
             Effect: Allow
             Principal:
               Fn::If:
                 - isProdOrRC
-                - 
-                  CanonicalUser:
-                    - {"Fn::GetAtt": [CloudfrontOAI, S3CanonicalUserId]}
+                - CanonicalUser:
+                    - { 'Fn::GetAtt': [CloudfrontOAI, S3CanonicalUserId] }
                   AWS:
-                    -  ${self:custom.vars.ORIGINREQUEST_ROLE_ARN}
-                - 
-                  CanonicalUser:
+                    - ${self:custom.vars.ORIGINREQUEST_ROLE_ARN}
+                - CanonicalUser:
                     - ${self:custom.vars.CLOUDFRONT_OAI_PROXY}
                   AWS:
                     - ${self:custom.vars.ORIGINREQUESTPROXY_ROLE_ARN}
@@ -88,16 +116,19 @@ resources:
               - s3:ListBucket
               - s3:GetObject
             Resource:
-              - {"Fn::Join": ["", ["arn:aws:s3:::", {Ref: WebsiteBucket}]]}
-              - {"Fn::Join": ["", ["arn:aws:s3:::", {Ref: WebsiteBucket}, "/*"]]}
+              - { 'Fn::Join': ['', ['arn:aws:s3:::', { Ref: WebsiteBucket }]] }
+              - {
+                  'Fn::Join':
+                    ['', ['arn:aws:s3:::', { Ref: WebsiteBucket }, '/*']],
+                }
     CloudfrontOAI:
-      Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+      Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
       Condition: isProdOrRC
       Properties:
         CloudFrontOriginAccessIdentityConfig:
           Comment: Created for ${self:custom.vars.STACKNAME}
     CDN:
-      Type: "AWS::CloudFront::Distribution"
+      Type: 'AWS::CloudFront::Distribution'
       Condition: isProdOrRC
       Properties:
         DistributionConfig:
@@ -106,7 +137,7 @@ resources:
             SslSupportMethod: sni-only
             MinimumProtocolVersion: TLSv1.2_2018
           WebACLId: ${self:custom.vars.WAF}
-          Aliases: 
+          Aliases:
             - ${self:custom.vars.DOMAIN}
           Enabled: true
           HttpVersion: http2
@@ -114,10 +145,20 @@ resources:
           IPV6Enabled: true
           DefaultRootObject: index.html
           Origins:
-            - DomainName: {"Fn::GetAtt": [WebsiteBucket, DomainName]}
+            - DomainName: { 'Fn::GetAtt': [WebsiteBucket, DomainName] }
               Id: s3-origin
               S3OriginConfig:
-                OriginAccessIdentity: {"Fn::Join": ["", ["origin-access-identity/cloudfront/", {Ref: CloudfrontOAI}]]}
+                OriginAccessIdentity:
+                  {
+                    'Fn::Join':
+                      [
+                        '',
+                        [
+                          'origin-access-identity/cloudfront/',
+                          { Ref: CloudfrontOAI },
+                        ],
+                      ],
+                  }
           DefaultCacheBehavior:
             AllowedMethods:
               - DELETE
@@ -144,7 +185,7 @@ resources:
             MinTTL: 0
             TargetOriginId: s3-origin
             ViewerProtocolPolicy: redirect-to-https
-            LambdaFunctionAssociations: 
+            LambdaFunctionAssociations:
               - EventType: origin-request
                 LambdaFunctionARN: ${self:custom.vars.ORIGINREQUEST_LAMBDA_ARN}
               - EventType: origin-response
@@ -152,39 +193,54 @@ resources:
         Tags: ${self:custom.vars.TAGS}
     DnsRecords:
       Condition: isProdOrRC
-      Type: "AWS::Route53::RecordSetGroup"
+      Type: 'AWS::Route53::RecordSetGroup'
       Properties:
         HostedZoneName: ${self:custom.vars.HOSTED_ZONE}
-        Comment: "DNS records associated with ${self:custom.vars.STACKNAME}"
+        Comment: 'DNS records associated with ${self:custom.vars.STACKNAME}'
         RecordSets:
           - Name: ${self:custom.vars.DOMAIN}
             Type: A
             AliasTarget:
-              DNSName:  {"Fn::GetAtt": [CDN, DomainName]}
+              DNSName: { 'Fn::GetAtt': [CDN, DomainName] }
               HostedZoneId: Z2FDTNDATAQYW2
+    ChatConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
 
   Outputs:
     SiteUrl:
       Value: ${self:custom.vars.SITE_URL}
       Description: URL of the website
     WebsiteBucket:
-      Value: {Ref: WebsiteBucket}
+      Value: { Ref: WebsiteBucket }
       Description: ID of the S3 bucket hosting static files
     CdnUrl:
       Condition: isProdOrRC
-      Value: {"Fn::GetAtt": [CDN, DomainName]}
+      Value: { 'Fn::GetAtt': [CDN, DomainName] }
       Description: URL of the CloudFront distribution
     DistributionId:
       Condition: isProdOrRC
-      Value: {Ref: CDN}
+      Value: { Ref: CDN }
       Description: ID of the CloudFront distribution
     ReactAppStackname:
       Value: ${self:custom.vars.STACKNAME}
       Description: Name of stack/service
+    ReactAppGitHash:
+      Value: ${git:sha1}
+      Description: Git Hash
     ReactAppServiceEndpoint:
-      Description: Service Endpoint
       Value: ${self:custom.vars.SERVICE_ENDPOINT}
-    
+      Description: Service Endpoint
+
 plugins:
   - serverless-plugin-git-variables
   - serverless-stack-output
@@ -195,3 +251,6 @@ package:
   individually: true
   exclude:
     - '**/*'
+  include:
+    - node_modules/**/*
+    - handler.js
