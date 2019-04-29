@@ -61,17 +61,21 @@ steps:
 
   LighthouseTest:
     title: Test with Lighthouse
-    image: klickinc/lighthouse-ci:latest
+    image: klickinc/lighthouse-ci@sha256:cdef4c5b05d1d42f0fc18fb6b82efa65b5909f31149269b555e1a12bbe545963
     working_directory: ${{main_clone}}
     commands:
       - echo ${{SITE_URL}}
-      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITE_URL}} --output json > report.json
-      - LIGHTHOUSE_SCORE=$(cat report.json | json score | awk '{print int($1)}')
-      - echo ${{SITE_URL}}
-      - echo "LIGHTHOUSE_SCORE ${LIGHTHOUSE_SCORE}"
-      - >-
-        cf_export LIGHTHOUSE_SCORE=${LIGHTHOUSE_SCORE}
-      # - if [ "$LIGHTHOUSE_SCORE" -le "60" ]; then exit 1; else exit 0; fi
+      - lighthouse --chrome-flags="--headless --no-sandbox" ${{SITE_URL}} --quiet --output json > report.json
+      - export LIGHTHOUSE_PERF=$(cat report.json | jqn --color false 'get("categories.performance.score")')
+      - export LIGHTHOUSE_A11Y=$(cat report.json | jqn --color false 'get("categories.accessibility.score")')
+      - export LIGHTHOUSE_BEST=$(cat report.json | jqn --color false 'get("categories.best-practices.score")')
+      - export LIGHTHOUSE_SEO=$(cat report.json | jqn --color false 'get("categories.seo.score")')
+      - export LIGHTHOUSE_PWA=$(cat report.json | jqn --color false 'get("categories.pwa.score")')
+      - cf_export LIGHTHOUSE_PERF
+      - cf_export LIGHTHOUSE_A11Y
+      - cf_export LIGHTHOUSE_BEST
+      - cf_export LIGHTHOUSE_SEO
+      - cf_export LIGHTHOUSE_PWA
     when:
       branch:
         only:
@@ -83,7 +87,7 @@ steps:
     title: Send Slack Notification
     image: cloudposse/slack-notifier@sha256:ff2fb8f7fd7fd04c5f005b90843493ff2bc8f620a9997c1e1a5b8ba8ee04c352
     environment:
-      - SLACK_WEBHOOK_URL=${{SLACK_WEBHOOK_URL}}
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/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
       - SLACK_USER_NAME=Codefresh
       - 'SLACK_ICON_EMOJI=:klick:'
       - SLACK_TITLE=Build Completed
@@ -103,8 +107,8 @@ steps:
       - SLACK_FIELD5_TITLE=Site URL
       - SLACK_FIELD5_VALUE=${{SITE_URL}}
       - SLACK_FIELD5_SHORT=true
-      - SLACK_FIELD6_TITLE=Lighthouse Score
-      - SLACK_FIELD6_VALUE=${{LIGHTHOUSE_SCORE}}
+      - SLACK_FIELD6_TITLE=Lighthouse Scores
+      - "SLACK_FIELD6_VALUE=PERF: ${{LIGHTHOUSE_PERF}}   A11Y: ${{LIGHTHOUSE_A11Y}}\nBEST: ${{LIGHTHOUSE_BEST}}   SEO: ${{LIGHTHOUSE_SEO}}\nPWA: ${{LIGHTHOUSE_PWA}}"
       - SLACK_FIELD6_SHORT=true
     when:
       branch:
