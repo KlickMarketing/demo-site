@@ -3,8 +3,7 @@ const config = {
     hash: process.env.ReactAppGitHash
   },
   site: {
-    url: process.env.ReactAppSiteUrl,
-    api: process.env.ReactAppServiceEndpoint,
+    api: process.env.ReactAppServiceEndpoint
   }
 };
 
