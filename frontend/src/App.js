@@ -1,5 +1,6 @@
 import React from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
+import { disableBodyScroll } from 'body-scroll-lock';
 import Voter from './Voter';
 
 const App = () => {
@@ -10,6 +11,8 @@ const App = () => {
     </StyledApp>
   );
 };
+
+disableBodyScroll();
 
 const GlobalStyle = createGlobalStyle`
   html, body, #root {

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Chart } from 'react-google-charts';
 import Sockette from 'sockette';
 import styled from 'styled-components';
-import _reduce from 'lodash.reduce';
 import config from './config';
 
 import sigilStark from './images/stark.png';
