@@ -14,7 +14,6 @@ const App = () => {
 const GlobalStyle = createGlobalStyle`
   html, body, #root {
     height: 100%;
-    background: #b5aaaa;
   }
 `;
 
