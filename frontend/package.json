@@ -48,6 +48,7 @@
     "react-dev-utils": "^6.1.1",
     "react-dom": "^16.8.4",
     "react-google-charts": "^3.0.12",
+    "react-vis": "^1.11.7",
     "resolve": "1.8.1",
     "sass-loader": "7.1.0",
     "sockette": "^2.0.5",

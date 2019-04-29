@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Chart } from 'react-google-charts';
+
+import {
+  XYPlot,
+  XAxis,
+  VerticalGridLines,
+  HorizontalGridLines,
+  HorizontalBarSeries
+} from 'react-vis';
+
 import Sockette from 'sockette';
 import styled from 'styled-components';
 import config from './config';
@@ -58,63 +66,35 @@ const Voter = () => {
     };
   }, []);
 
-  const ballotArray = [
-    ' ',
-    ballotsList.Stark,
-    ballotsList.Baratheon,
-    ballotsList.Targaryen,
-    ballotsList.Greyjoy,
-    ballotsList.Lannister,
-    ballotsList.Tully
-  ];
+  const colorMap = {
+    Stark: '#414141',
+    Baratheon: '#693813',
+    Targaryen: '#9C1408',
+    Greyjoy: '#302955',
+    Lannister: '#ecad00',
+    Tully: '#1b94b7'
+  };
+
+  const formatData = data =>
+    Object.keys(data).map(key => ({
+      y: key,
+      x: data[key],
+      color: colorMap[key]
+    }));
 
   return (
     <VoterArea>
       <ChartBar>
-        <Chart
-          width="600px"
-          height="400px"
-          chartType="Bar"
-          loader={<div>Loading Chart</div>}
-          data={[
-            [
-              '',
-              'Stark',
-              'Baratheon',
-              'Targaryen',
-              'Greyjoy',
-              'Lannister',
-              'Tully'
-            ],
-            ballotArray
-          ]}
-          options={{
-            hAxis: { minValue: 0, maxValue: 15 },
-            vAxis: { minValue: 0, maxValue: 15 },
-            legend: { position: 'none' },
-            animation: {
-              duration: 1000,
-              easing: 'out',
-              startup: true
-            },
-            colors: [
-              '#414141',
-              '#693813',
-              '#9C1408',
-              '#302955',
-              '#ecad00',
-              '#1b94b7'
-            ],
-            bars: 'horizontal',
-            axes: {
-              y: {
-                0: { side: 'right' }
-              }
-            }
-          }}
-          rootProps={{ 'data-testid': '1' }}
-          chartPackages={['corechart', 'controls', 'charteditor']}
-        />
+        <XYPlot width={600} height={400} yType="ordinal">
+          <VerticalGridLines />
+          <HorizontalGridLines />
+          <XAxis />
+          <HorizontalBarSeries
+            animation
+            colorType="literal"
+            data={formatData(ballotsList)}
+          />
+        </XYPlot>
       </ChartBar>
       <VoterButtonBar>
         <VoterButton color="#414141">
