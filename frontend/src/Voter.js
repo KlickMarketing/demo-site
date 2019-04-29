@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Chart } from 'react-google-charts';
 import Sockette from 'sockette';
 import styled from 'styled-components';
+import Color from 'color';
 import config from './config';
 
+import qr from './images/qr.png';
 import sigilStark from './images/stark.png';
 import sigilBaratheon from './images/baratheon.png';
 import sigilTargaryen from './images/targaryen.png';
@@ -71,6 +73,7 @@ const Voter = () => {
   return (
     <VoterArea>
       <ChartBar>
+        <StyledQR src={qr} alt="Scan Me" />
         <Chart
           width="600px"
           height="400px"
@@ -115,6 +118,7 @@ const Voter = () => {
           rootProps={{ 'data-testid': '1' }}
           chartPackages={['corechart', 'controls', 'charteditor']}
         />
+        <BitlyLink>bit.ly/2V4oBZN</BitlyLink>
       </ChartBar>
       <VoterButtonBar>
         <VoterButton color="#414141">
@@ -171,14 +175,27 @@ const VoterArea = styled.div`
 `;
 
 const ChartBar = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   align-self: center;
   justify-self: center;
-  transform: scale(0.5);
   overflow: hidden;
 
   @media only screen and (min-width: 768px) {
     transform: inherit;
   }
+`;
+
+const StyledQR = styled.img`
+  align-self: center;
+  justify-self: center;
+`;
+
+const BitlyLink = styled.div`
+  align-self: center;
+  justify-self: center;
+  font-size: 4em;
+  font-weight: 700;
 `;
 
 const VoterButtonBar = styled.div`
@@ -193,6 +210,19 @@ const VoterButtonBar = styled.div`
 
 const VoterButton = styled.div`
   background-color: ${props => (props.color ? props.color : 'green')};
+
+  :hover,
+  :active {
+    background-color: ${props =>
+      props.color
+        ? Color(props.color)
+            .darken(0.5)
+            .hex()
+        : Color('green')
+            .darken(0.5)
+            .hex()};
+    cursor: pointer;
+  }
 `;
 
 const VoterThumb = styled.img`
