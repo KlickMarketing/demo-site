@@ -35,7 +35,7 @@ const Voter = () => {
     setBallotsList({ ...ballotsList, ...voteData });
   };
 
-  const onConnection = e => {
+  const onConnection = () => {
     onVote('');
   };
 
