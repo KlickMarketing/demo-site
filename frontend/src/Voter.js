@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Chart } from 'react-google-charts';
+
+import {
+  XYPlot,
+  XAxis,
+  VerticalGridLines,
+  HorizontalGridLines,
+  HorizontalBarSeries
+} from 'react-vis';
+
 import Sockette from 'sockette';
 import styled from 'styled-components';
 import Color from 'color';
 import QRCode from 'qrcode';
 import config from './config';
 
-import qr from './images/qr.png';
 import sigilStark from './images/stark.png';
 import sigilBaratheon from './images/baratheon.png';
 import sigilTargaryen from './images/targaryen.png';
@@ -48,11 +55,10 @@ const Voter = () => {
   useEffect(() => {
     QRCode.toDataURL(config.site.url, { scale: 10 })
       .then(url => {
-        console.log(url);
         setQrCode(url);
       })
       .catch(err => {
-        console.error(err);
+        console.error(err); // eslint-disable-line no-console
       });
   }, []);
 
@@ -73,67 +79,40 @@ const Voter = () => {
     };
   }, []);
 
-  const ballotArray = [
-    ' ',
-    ballotsList.Stark,
-    ballotsList.Baratheon,
-    ballotsList.Targaryen,
-    ballotsList.Greyjoy,
-    ballotsList.Lannister,
-    ballotsList.Tully
-  ];
+  const colorMap = {
+    Stark: '#414141',
+    Baratheon: '#693813',
+    Targaryen: '#9C1408',
+    Greyjoy: '#302955',
+    Lannister: '#ecad00',
+    Tully: '#1b94b7'
+  };
+
+  const formatData = data =>
+    Object.keys(data).map(key => ({
+      y: key,
+      x: data[key],
+      color: colorMap[key]
+    }));
 
   return (
     <VoterArea>
       <ChartBar>
         <ShortCuts>
           <StyledQR src={qrCode} alt="Scan Me" />
+          <br />
           <BitlyLink>bit.ly/2V4oBZN</BitlyLink>
         </ShortCuts>
-        <StyledChart
-          width="600px"
-          height="400px"
-          chartType="Bar"
-          loader={<div>Loading Chart</div>}
-          data={[
-            [
-              '',
-              'Stark',
-              'Baratheon',
-              'Targaryen',
-              'Greyjoy',
-              'Lannister',
-              'Tully'
-            ],
-            ballotArray
-          ]}
-          options={{
-            hAxis: { minValue: 0, maxValue: 15 },
-            vAxis: { minValue: 0, maxValue: 15 },
-            legend: { position: 'none' },
-            animation: {
-              duration: 1000,
-              easing: 'out',
-              startup: true
-            },
-            colors: [
-              '#414141',
-              '#693813',
-              '#9C1408',
-              '#302955',
-              '#ecad00',
-              '#1b94b7'
-            ],
-            bars: 'horizontal',
-            axes: {
-              y: {
-                0: { side: 'right' }
-              }
-            }
-          }}
-          rootProps={{ 'data-testid': '1' }}
-          chartPackages={['corechart', 'controls', 'charteditor']}
-        />
+        <StyledChart width={600} height={400} yType="ordinal">
+          <VerticalGridLines />
+          <HorizontalGridLines />
+          <XAxis />
+          <HorizontalBarSeries
+            animation
+            colorType="literal"
+            data={formatData(ballotsList)}
+          />
+        </StyledChart>
       </ChartBar>
       <VoterButtonBar>
         <VoterButton color="#414141">
@@ -211,15 +190,18 @@ const StyledQR = styled.img`
   display: none;
 
   @media only screen and (min-width: 992px) {
-    display: inline;
+    display: block;
   }
 `;
 
-const StyledChart = styled(Chart)`
-  transform: scale(0.8);
+const StyledChart = styled(XYPlot)`
+  align-self: center;
+  justify-self: center;
+  transform: scale(0.5);
+  padding-right: 30px;
 
   @media only screen and (min-width: 768px) {
-    transform: inherit;
+    transform: none;
   }
 `;
 
@@ -229,7 +211,7 @@ const BitlyLink = styled.span`
   display: none;
 
   @media only screen and (min-width: 992px) {
-    display: inherit;
+    display: inline;
   }
 `;
 
@@ -251,10 +233,10 @@ const VoterButton = styled.div`
     background-color: ${props =>
       props.color
         ? Color(props.color)
-            .darken(0.5)
+            .lighten(0.5)
             .hex()
         : Color('green')
-            .darken(0.5)
+            .lighten(0.5)
             .hex()};
     cursor: pointer;
   }
