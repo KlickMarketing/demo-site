@@ -24,6 +24,7 @@ const Voter = () => {
   });
 
   const onVote = vote => {
+    console.log('vote:', vote); // eslint-disable-line no-console
     ws.json({
       action: 'sendMessage',
       data: JSON.stringify(vote)
@@ -35,11 +36,16 @@ const Voter = () => {
     setBallotsList({ ...ballotsList, ...voteData });
   };
 
+  const onConnection = e => {
+    console.log('connection:', e); // eslint-disable-line no-console
+    onVote('');
+  };
+
   useEffect(() => {
     ws = new Sockette(config.site.api, {
       timeout: 5e3,
       maxAttempts: 1,
-      onopen: e => console.log('connected:', e), // eslint-disable-line no-console
+      onopen: e => onConnection(e),
       onmessage: e => onMessageReceied(e),
       onreconnect: e => console.log('Reconnecting...', e), // eslint-disable-line no-console
       onmaximum: e => console.log('Stop Attempting!', e), // eslint-disable-line no-console

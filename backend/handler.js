@@ -58,11 +58,19 @@ module.exports.sendMessage = async (event, context, callback) => {
     console.log(err);
     return { statusCode: 500 };
   }
+
+  console.log({ eventbody: event.body });
+  const postData = JSON.parse(JSON.parse(event.body).data);
+  console.log({ postData });
+  const votes =
+    postData === '' ? await getVotes(postData) : await addVote(postData);
+  console.log({ votes });
+
   const postCalls = connectionData.Items.filter(
     ({ connectionId }) => connectionId.S !== STATS_FIELD_NAME
   ).map(async ({ connectionId }) => {
     try {
-      return await send(event, connectionId.S);
+      return await send(event, connectionId.S, votes);
     } catch (err) {
       if (err.statusCode === 410) {
         return await deleteConnection(connectionId.S);
@@ -81,27 +89,24 @@ module.exports.sendMessage = async (event, context, callback) => {
   callback(null, successfullResponse);
 };
 
-const cleanData = vote =>
-  _reduce(
-    _omit(vote.Attributes, ['connectionId']),
+const cleanData = vote => {
+  const rootKey = vote.Attributes ? 'Attributes' : 'Item';
+  return _reduce(
+    _omit(vote[rootKey], ['connectionId']),
     (result, value, key) => ({ ...result, ...{ [key]: parseInt(value.N) } }),
     {}
   );
+};
 
-const send = async (event, connectionId) => {
-  console.log({ eventbody: event.body });
-  const postData = JSON.parse(JSON.parse(event.body).data);
-  console.log({ postData });
+const send = async (event, connectionId, votes) => {
   const apigwManagementApi = new AWS.ApiGatewayManagementApi({
     apiVersion: '2018-11-29',
     endpoint: event.requestContext.domainName + '/' + event.requestContext.stage
   });
-  const vote = await addVote(postData);
-  console.log({ vote });
   return await apigwManagementApi
     .postToConnection({
       ConnectionId: connectionId,
-      Data: JSON.stringify(cleanData(vote))
+      Data: JSON.stringify(votes)
     })
     .promise();
 };
@@ -129,20 +134,26 @@ const addVote = house => {
     ReturnValues: 'ALL_NEW'
   };
 
-  return DDB.updateItem(updateParams).promise();
+  return DDB.updateItem(updateParams)
+    .promise()
+    .then(cleanData);
 };
 
 const getVotes = () => {
   const params = {
     Key: {
-      Key: {
-        connectionId: { S: STATS_FIELD_NAME }
-      }
+      connectionId: { S: STATS_FIELD_NAME }
     },
     TableName: process.env.CHATCONNECTION_TABLE
   };
 
-  return DDB.getItem(params).promise();
+  return DDB.getItem(params)
+    .promise()
+    .then(v => {
+      console.log('v', v);
+      return v;
+    })
+    .then(cleanData);
 };
 
 const deleteConnection = connectionId => {
