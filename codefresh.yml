@@ -6,7 +6,7 @@ steps:
     working_directory: ${{main_clone}}
     commands:
       - cd backend && yarn install
-      - cd ..frontend && yarn install
+      - cd ../frontend && yarn install
 
   DeployDev:
     title: Deploy Feature Branch
