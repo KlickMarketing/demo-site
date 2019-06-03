@@ -2,7 +2,7 @@ version: '1.0'
 steps:
   UnitTesting:
     title: Unit Testing Application
-    image: klickinc/marketing-build-harness:9558330
+    image: klickinc/marketing-build-harness@sha256:d396d7dad7e4e7dfe5358827784d30b491c616b84ac91bb3741c65597197a0f9
     working_directory: ${{main_clone}}
     commands:
       - cd backend && yarn install
@@ -10,7 +10,7 @@ steps:
 
   DeployDev:
     title: Deploy Feature Branch
-    image: klickinc/marketing-build-harness:9558330
+    image: klickinc/marketing-build-harness@sha256:d396d7dad7e4e7dfe5358827784d30b491c616b84ac91bb3741c65597197a0f9
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
@@ -27,7 +27,7 @@ steps:
 
   DeployRC:
     title: Deploy Release Candidate
-    image: klickinc/marketing-build-harness:9558330
+    image: klickinc/marketing-build-harness@sha256:d396d7dad7e4e7dfe5358827784d30b491c616b84ac91bb3741c65597197a0f9
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
@@ -44,7 +44,7 @@ steps:
 
   DeployProd:
     title: Deploy to Production
-    image: klickinc/marketing-build-harness:9558330
+    image: klickinc/marketing-build-harness@sha256:d396d7dad7e4e7dfe5358827784d30b491c616b84ac91bb3741c65597197a0f9
     working_directory: ${{main_clone}}
     environment:
       - AWS_DEFAULT_REGION=us-east-1
