@@ -30,12 +30,12 @@ default: &default
         ],
     }
 
-  ORIGINREQUEST_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:serverlessrepo-usher-proxy-demo-originrequest:1"
-  ORIGINRESPONSE_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:serverlessrepo-usher-proxy-demo-originresponse:1"
-  ORIGINREQUESTPROXY_ROLE_ARN: "arn:aws:iam::860984675421:role/serverlessrepo-usher-proxy-demo-originrequestproxy-role"
-  ORIGINREQUEST_ROLE_ARN: "arn:aws:iam::860984675421:role/serverlessrepo-usher-proxy-demo-originrequest-role"
-  CFPROXYENTRY_ARN: "arn:aws:lambda:us-east-1:860984675421:function:serverlessrepo-usher-prox-ProxyEntryLambdaFunction-1A55X4DFZE04F"
-  CLOUDFRONT_OAI_PROXY: "fc8f357cd097ed7553e5c3b4e7a2222e5b3e11964e244cbf8d72b4519359550d823e8dc881d74d2261b7eb92aa25a43d"
+  ORIGINREQUEST_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:usher-proxy-demo-originrequest:1"
+  ORIGINRESPONSE_LAMBDA_ARN: "arn:aws:lambda:us-east-1:860984675421:function:usher-proxy-demo-originresponse:1"
+  ORIGINREQUESTPROXY_ROLE_ARN: "arn:aws:iam::860984675421:role/usher-proxy-demo-originrequestproxy-role"
+  ORIGINREQUEST_ROLE_ARN: "arn:aws:iam::860984675421:role/usher-proxy-demo-originrequest-role"
+  CFPROXYENTRY_ARN: "arn:aws:lambda:us-east-1:860984675421:function:usher-proxy-demo-ProxyEntryLambdaFunction-2HIBZKH6JMB2"
+  CLOUDFRONT_OAI_PROXY: "bc1ee885c1d18f29e0f4c23b9a6973c0a8d2763d43ae1f5ece26601b88918c10088e4d4c2ccfe1c7d9f6a96a6d756786"
 
 dev:
   <<: [*default]
